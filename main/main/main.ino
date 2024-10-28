@@ -67,22 +67,20 @@
  */
 
 #include <CodeCell.h>
+#include <Preferences.h>
 #include <math.h>
 
 CodeCell myCodeCell;
-
-void setup() {
-  Serial.begin(115200); // Set Serial baud rate to 115200
-  myCodeCell.Init(LIGHT + MOTION_ROTATION + MOTION_ACCELEROMETER + MOTION_GRAVITY + MOTION_GYRO + MOTION_MAGNETOMETER + MOTION_STEP_COUNTER + MOTION_STATE + MOTION_TAP_DETECTOR);
-  myCodeCell.Run();
-}
+Preferences preferences;
 
 unsigned long previousMillis = 0;
 unsigned long lastRunMillis = 0;
 unsigned long lastPrintMillis = 0;
+unsigned long lastBackupMillis = 0;
 const long sensorInterval = 10; // 10ms interval for sensor reads
 const long runInterval = 100;   // 100ms for myCodeCell.Run()
-const long printInterval = 5000; // Print sensor data every 1000ms interval
+const long printInterval = 5000; // Print sensor data every 5000ms interval
+const long backupInterval = 10000; // Backup data every 10000ms
 
 int cycle = 0;
 float gx, gy, gz;
@@ -124,6 +122,23 @@ int pushupCount = 0;
 short unsigned int stepCount = 0;
 float timeSpentRunning = 0.0;
 
+void setup() {
+  Serial.begin(115200); // Set Serial baud rate to 115200
+  myCodeCell.Init(LIGHT + MOTION_ROTATION + MOTION_ACCELEROMETER + MOTION_GRAVITY + MOTION_GYRO + MOTION_MAGNETOMETER + MOTION_STEP_COUNTER + MOTION_STATE + MOTION_TAP_DETECTOR);
+  myCodeCell.Run();
+
+  // Load data from persistence
+  preferences.begin("fitnessData", false);
+  pushupCount = preferences.getInt("pushupCount", 0);
+  stepCount = preferences.getUInt("stepCount", 0);
+  timeSpentRunning = preferences.getFloat("timeRunning", 0.0);
+  preferences.end();
+
+  Serial.println("Loaded data from persistence:");
+  Serial.printf("Pushup Count: %d\n", pushupCount);
+  Serial.printf("Step Count: %d\n", stepCount);
+  Serial.printf("Time Spent Running: %.2f seconds\n", timeSpentRunning);
+}
 
 void loop() {
   unsigned long currentMillis = millis();
@@ -257,6 +272,19 @@ void loop() {
 
     Serial.println("====================================================\n");
 
-    
+  }
+
+  // Backup data every 10 seconds
+  if (currentMillis - lastBackupMillis >= backupInterval) {
+    lastBackupMillis = currentMillis;
+
+    // Save data to persistence
+    preferences.begin("fitnessData", false);
+    preferences.putInt("pushupCount", pushupCount);
+    preferences.putUInt("stepCount", stepCount);
+    preferences.putFloat("timeRunning", timeSpentRunning);
+    preferences.end();
+
+    Serial.println("Data saved to persistence.");
   }
 }
